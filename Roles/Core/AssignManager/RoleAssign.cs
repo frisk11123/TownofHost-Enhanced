@@ -64,8 +64,19 @@ public class RoleAssign
         switch (Options.CurrentGameMode)
         {
             case CustomGameMode.FFA:
-                foreach (PlayerControl pc in Main.AllAlivePlayerControls)
+                foreach (PlayerControl pc in Main.AllPlayerControls)
                 {
+                    if (Main.EnableGM.Value && pc.IsHost())
+                    {
+                        RoleResult[pc.PlayerId] = CustomRoles.GM;
+                        continue;
+                    }
+                    else if (TagManager.AssignGameMaster(pc.FriendCode))
+                    {
+                        RoleResult[pc.PlayerId] = CustomRoles.GM;
+                        Logger.Info($"Assign Game Master due to tag for [{pc.PlayerId}]{pc.GetRealName()}", "TagManager");
+                        continue;
+                    }
                     RoleResult[pc.PlayerId] = CustomRoles.Killer;
                 }
                 return;
@@ -213,12 +224,26 @@ public class RoleAssign
             RoleResult[PlayerControl.LocalPlayer.PlayerId] = CustomRoles.GM;
             AllPlayers.Remove(PlayerControl.LocalPlayer);
         }
-        if (Main.EnableGM.Value)
+
+        foreach (var player in Main.AllPlayerControls)
         {
-            RoleResult[PlayerControl.LocalPlayer.PlayerId] = CustomRoles.GM;
-            AllPlayers.Remove(PlayerControl.LocalPlayer);
-            SetRoles.Remove(PlayerControl.LocalPlayer.PlayerId);
+            if (player == null) continue;
+
+            if (TagManager.AssignGameMaster(player.FriendCode))
+            {
+                Logger.Info($"Assign Game Master due to tag for [{player.PlayerId}]{player.GetRealName()}", "TagManager");
+                RoleResult[player.PlayerId] = CustomRoles.GM;
+                SetRoles.Remove(player.PlayerId);
+                AllPlayers.Remove(player);
+            }
+            else if (Main.EnableGM.Value && player.IsHost())
+            {
+                RoleResult[PlayerControl.LocalPlayer.PlayerId] = CustomRoles.GM;
+                SetRoles.Remove(PlayerControl.LocalPlayer.PlayerId);
+                AllPlayers.Remove(PlayerControl.LocalPlayer);
+            }
         }
+
         // Pre-Assigned Roles By Host Are Selected First
         foreach (var item in SetRoles)
         {

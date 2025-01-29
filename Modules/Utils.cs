@@ -881,9 +881,9 @@ public static class Utils
 
         SendMessage(string.Join("\n", impsb), PlayerId, ColorString(GetRoleColor(CustomRoles.Impostor), GetString("ImpostorRoles")), ShouldSplit: true);
         SendMessage(string.Join("\n", crewsb), PlayerId, ColorString(GetRoleColor(CustomRoles.Crewmate), GetString("CrewmateRoles")), ShouldSplit: true);
-        SendMessage(string.Join("\n", neutralsb), PlayerId, GetString("NeutralRoles"), ShouldSplit: true);
-        SendMessage(string.Join("\n", covenb), PlayerId, GetString("CovenRoles"), ShouldSplit: true);
-        SendMessage(string.Join("\n", addonsb), PlayerId, GetString("AddonRoles"), ShouldSplit: true);
+        SendMessage(string.Join("\n", neutralsb), PlayerId, ColorString(new Color32(127, 140, 141, byte.MaxValue), GetString("NeutralRoles")), ShouldSplit: true);
+        SendMessage(string.Join("\n", covenb), PlayerId, ColorString(GetRoleColor(CustomRoles.Coven), GetString("CovenRoles")), ShouldSplit: true);
+        SendMessage(string.Join("\n", addonsb), PlayerId, ColorString(new Color32(255, 154, 206, byte.MaxValue), GetString("AddonRoles")), ShouldSplit: true);
     }
     public static void ShowChildrenSettings(OptionItem option, ref StringBuilder sb, int deep = 0, bool command = false)
     {
@@ -1913,7 +1913,7 @@ public static class Utils
     public static Task DoNotifyRoles(PlayerControl SpecifySeer = null, PlayerControl SpecifyTarget = null, bool isForMeeting = false, bool NoCache = false, bool ForceLoop = true, bool CamouflageIsForMeeting = false, bool MushroomMixupIsActive = false)
     {
         if (!AmongUsClient.Instance.AmHost || GameStates.IsHideNSeek || Main.AllPlayerControls == null || SetUpRoleTextPatch.IsInIntro) return Task.CompletedTask;
-        if (GameStates.IsMeeting)
+        if (MeetingHud.Instance)
         {
             // When the meeting window is active and game is not ended
             if (!GameEndCheckerForNormal.GameIsEnded) return Task.CompletedTask;
@@ -1950,6 +1950,8 @@ public static class Utils
         {
             // Do nothing when the seer is not present in the game
             if (seer == null) continue;
+
+            Main.LowLoadUpdateName[seer.PlayerId] = true;
 
             // Only non-modded players or player left
             if (seer.IsModded() || seer.PlayerId == OnPlayerLeftPatch.LeftPlayerId || seer.Data.Disconnected) continue;
@@ -2112,6 +2114,9 @@ public static class Utils
                     if (seer != target && seer != DollMaster.DollMasterTarget)
                         target = DollMaster.SwapPlayerInfo(realTarget); // If a player is possessed by the Dollmaster swap each other's controllers.
 
+                    Main.LowLoadUpdateName[target.PlayerId] = true;
+                    Main.LowLoadUpdateName[realTarget.PlayerId] = true;
+
                     //logger.Info("NotifyRoles-Loop2-" + target.GetNameWithRole() + ":START");
 
                     // Hide player names in during Mushroom Mixup if seer is alive and desync impostor
@@ -2155,25 +2160,30 @@ public static class Utils
                         string TargetRoleText = KnowRoleTarget
                                 ? $"<size={fontSize}>{seer.GetDisplayRoleAndSubName(target, false)}{GetProgressText(target)}</size>\r\n" : "";
 
+                        string BlankRT = string.Empty;
+
                         if (seer.IsAlive() && Overseer.IsRevealedPlayer(seer, target) && target.Is(CustomRoles.Trickster))
                         {
-                            TargetRoleText = Overseer.GetRandomRole(seer.PlayerId); // Random trickster role
-                            TargetRoleText += TaskState.GetTaskState(); // Random task count for revealed trickster
+                            BlankRT = Overseer.GetRandomRole(seer.PlayerId); // Random trickster role
+                            BlankRT += TaskState.GetTaskState(); // Random task count for revealed trickster
+                            TargetRoleText = $"<size={fontSize}>{BlankRT}</size>\r\n";
                         }
                         // Same thing as Trickster but for Illusioned Coven
                         if (seer.IsAlive() && Overseer.IsRevealedPlayer(seer, target) && Illusionist.IsCovIllusioned(target.PlayerId))
                         {
-                            TargetRoleText = Overseer.GetRandomRole(seer.PlayerId);
-                            TargetRoleText += TaskState.GetTaskState();
+                            BlankRT = Overseer.GetRandomRole(seer.PlayerId);
+                            BlankRT += TaskState.GetTaskState();
+                            TargetRoleText = $"<size={fontSize}>{BlankRT}</size>\r\n";
                         }
                         if (seer.IsAlive() && Overseer.IsRevealedPlayer(seer, target) && Illusionist.IsNonCovIllusioned(target.PlayerId))
                         {
                             var randomRole = CustomRolesHelper.AllRoles.Where(role => role.IsEnable() && !role.IsAdditionRole() && role.IsCoven()).ToList().RandomElement();
-                            TargetRoleText = ColorString(GetRoleColor(randomRole), GetString(randomRole.ToString()));
+                            BlankRT = ColorString(GetRoleColor(randomRole), GetString(randomRole.ToString()));
                             if (randomRole is CustomRoles.CovenLeader or CustomRoles.Jinx or CustomRoles.Illusionist or CustomRoles.VoodooMaster) // Roles with Ability Uses
                             {
-                                TargetRoleText += randomRole.GetStaticRoleClass().GetProgressText(target.PlayerId, false);
+                                BlankRT += randomRole.GetStaticRoleClass().GetProgressText(target.PlayerId, false);
                             }
+                            TargetRoleText = $"<size={fontSize}>{BlankRT}</size>\r\n";
                         }
 
                         // ====== Target player name ======

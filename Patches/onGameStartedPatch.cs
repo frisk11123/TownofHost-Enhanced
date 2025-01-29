@@ -172,6 +172,8 @@ internal class ChangeRoleSettings
                     }
                 }
 
+                Main.LowLoadUpdateName[pc.PlayerId] = true;
+
                 Main.PlayerStates[pc.PlayerId] = new(pc.PlayerId)
                 {
                     NormalOutfit = new NetworkedPlayerInfo.PlayerOutfit().Set(currentName, pc.Data.Outfits[PlayerOutfitType.Default].ColorId, pc.Data.Outfits[PlayerOutfitType.Default].HatId, pc.Data.Outfits[PlayerOutfitType.Default].SkinId, pc.Data.Outfits[PlayerOutfitType.Default].VisorId, pc.Data.Outfits[PlayerOutfitType.Default].PetId, pc.Data.Outfits[PlayerOutfitType.Default].NamePlateId),
@@ -421,9 +423,9 @@ internal class StartGameHostPatch
 
             if (Options.CurrentGameMode == CustomGameMode.FFA)
             {
-                foreach (var pair in Main.PlayerStates)
+                foreach (var pair in RoleAssign.RoleResult)
                 {
-                    ExtendedPlayerControl.RpcSetCustomRole(pair.Key, pair.Value.MainRole);
+                    pair.Key.GetPlayer()?.RpcSetCustomRole(pair.Value, checkAddons: false);
                 }
                 goto EndOfSelectRolePatch;
             }
@@ -683,6 +685,18 @@ internal class SelectRolesPatch
                 PlayerControl.LocalPlayer.RpcSetRole(RoleTypes.Crewmate, false);
                 PlayerControl.LocalPlayer.Data.IsDead = true;
                 Main.PlayerStates[PlayerControl.LocalPlayer.PlayerId].SetDead();
+            }
+
+            foreach (var player in Main.AllPlayerControls)
+            {
+                if (!player.IsDisconnected() && TagManager.AssignGameMaster(player.FriendCode))
+                {
+                    Logger.Info($"Setting GM role for [{player.PlayerId}]{player.GetRealName()}", "SelectRolesPatch.HnS");
+                    player.RpcSetCustomRole(CustomRoles.GM);
+                    player.RpcSetRole(RoleTypes.Crewmate, false);
+                    player.Data.IsDead = true;
+                    Main.PlayerStates[player.PlayerId].SetDead();
+                }
             }
 
             EAC.OriginalRoles = [];
